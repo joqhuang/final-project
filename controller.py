@@ -5,9 +5,11 @@ if __name__ == '__main__':
     print("Hello, welcome to the program!")
     new_or_old = input('''
         To begin, would you like to add new data to the database
-        or work with old data? Enter 'new', 'old', or 'quit' to
-        exit the program.
-    ''')
+        or work with existing data? Enter 'new' to run a new query
+        and add additional entries to the databases. Enter 'existing'
+        to work with existing data. Enter 'quit' to exit the program.
+        ''')
+    keyword = ''
     if new_or_old == 'new':
         keyword = input("Please enter a search term or:  ")
         while keyword != 'continue':
@@ -23,7 +25,7 @@ if __name__ == '__main__':
             else:
                 model.run_query(keyword)
             keyword = input("Please enter another search term or 'continue' to move on:  ")
-    if new_or_old == 'old' or keyword == 'continue':
+    if new_or_old == 'existing' or keyword == 'continue':
         app.app.run(debug=False)
     else:
         print("Goodbye!")

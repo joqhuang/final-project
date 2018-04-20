@@ -3,6 +3,8 @@ import json
 from datetime import datetime
 from bs4 import BeautifulSoup
 import sqlite3 as sqlite
+from plotly.offline import plot
+from plotly.graph_objs import Scatter, Layout
 import codecs
 import sys
 
@@ -82,44 +84,46 @@ def get_dbpedia_data(keyword):
         main_html = CACHE_DICTION[keyword]
     main_soup = BeautifulSoup(main_html, 'html.parser')
     table_element = main_soup.find("tbody")
-    entity_elemnts = table_element.find_all('tr')
     dbpedia_html_list = []
-    for element in entity_elemnts:
-        title = element.find(class_="describe")["title"]
-        if title.split(":")[0] == "dbr": #this ensures that only dbr and not wikidata entities are scraped
-            href_attr = element.find("a")["href"]
-            entity_url = "http://dbpedia.org{}".format(href_attr)
-            if entity_url in CACHE_DICTION:
-                print("Retrieving entity from CACHE...")
-                entity_html = CACHE_DICTION[entity_url]
-            else:
-                print("Crawling dbpedia to extract entities...")
-                entity_html_response_object = requests.get(entity_url)
-                entity_json_obj = json.dumps(entity_html_response_object.text)
-                CACHE_DICTION[entity_url]=json.loads(entity_json_obj)
-                dumped_json_cache = json.dumps(CACHE_DICTION)
-                fw = open(CACHE_FNAME,"w")
-                fw.write(dumped_json_cache)
-                fw.close()
-                entity_html = CACHE_DICTION[entity_url]
-            entity_soup = BeautifulSoup(entity_html,'html.parser')
-            dbpedia_url = entity_soup.find(class_='page_resource_info').find("a")["href"]
-            if dbpedia_url in CACHE_DICTION:
-                dbpedia_html = CACHE_DICTION[dbpedia_url]
-            else:
-                print("Even more crawling...")
-                dbpedia_html_response_object = requests.get(dbpedia_url)
-                dbpedia_json_obj = json.dumps(dbpedia_html_response_object.text)
-                CACHE_DICTION[dbpedia_url]=json.loads(dbpedia_json_obj)
-                dumped_json_cache = json.dumps(CACHE_DICTION)
-                fw = open(CACHE_FNAME,"w")
-                fw.write(dumped_json_cache)
-                fw.close()
-                dbpedia_html = CACHE_DICTION[dbpedia_url]
-            dbpedia_html_list.append(dbpedia_html)
+    if table_element == None:
+        print("Sorry, there are no entries for that search.")
+    else:
+        entity_elemnts = table_element.find_all('tr')
+        for element in entity_elemnts:
+            title = element.find(class_="describe")["title"]
+            if title.split(":")[0] == "dbr": #this ensures that only dbr and not wikidata entities are scraped
+                href_attr = element.find("a")["href"]
+                entity_url = "http://dbpedia.org{}".format(href_attr)
+                if entity_url in CACHE_DICTION:
+                    print("Retrieving entity from CACHE...")
+                    entity_html = CACHE_DICTION[entity_url]
+                else:
+                    print("Crawling dbpedia to extract entities...")
+                    entity_html_response_object = requests.get(entity_url)
+                    entity_json_obj = json.dumps(entity_html_response_object.text)
+                    CACHE_DICTION[entity_url]=json.loads(entity_json_obj)
+                    dumped_json_cache = json.dumps(CACHE_DICTION)
+                    fw = open(CACHE_FNAME,"w")
+                    fw.write(dumped_json_cache)
+                    fw.close()
+                    entity_html = CACHE_DICTION[entity_url]
+                entity_soup = BeautifulSoup(entity_html,'html.parser')
+                dbpedia_url = entity_soup.find(class_='page_resource_info').find("a")["href"]
+                if dbpedia_url in CACHE_DICTION:
+                    dbpedia_html = CACHE_DICTION[dbpedia_url]
+                else:
+                    print("Even more crawling...")
+                    dbpedia_html_response_object = requests.get(dbpedia_url)
+                    dbpedia_json_obj = json.dumps(dbpedia_html_response_object.text)
+                    CACHE_DICTION[dbpedia_url]=json.loads(dbpedia_json_obj)
+                    dumped_json_cache = json.dumps(CACHE_DICTION)
+                    fw = open(CACHE_FNAME,"w")
+                    fw.write(dumped_json_cache)
+                    fw.close()
+                    dbpedia_html = CACHE_DICTION[dbpedia_url]
+                dbpedia_html_list.append(dbpedia_html)
     conn = sqlite.connect(DB_NAME)
     cur = conn.cursor()
-    #later add an if else section to give users the option to update the table
     add_to_keyword_table = '''
     INSERT INTO 'Keywords' (Keyword, Entities, SearchDate)
     VALUES (?,?,?)
@@ -307,3 +311,87 @@ def get_sorted_objects(entities_obj_list, sortby='name', sortorder='desc'):
     else:
         sorted_objects = sorted(entities_obj_list, key= lambda x: x.id, reverse=rev)
     return sorted_objects
+
+def  graph_locations(coordinates_dict):
+    labels = []
+    lat = []
+    lon = []
+    for entry in coordinates_dict:
+        labels.append(entry)
+        lat.append(coordinates_dict[entry]["lat"])
+        lon.append(coordinates_dict[entry]["lon"])
+    trace = dict(
+            type = 'scattergeo',
+            locationmode = 'country names',
+            lon = lon,
+            lat = lat,
+            text = labels,
+            mode = 'markers',
+            marker = dict(
+                size = 20,
+                symbol = 'star',
+                color = 'black'
+            ))
+    data = [trace]
+    min_lat = 180
+    max_lat = -180
+    min_lon = 180
+    max_lon = -180
+    for str_v in lat:
+        v = float(str_v)
+        if v < min_lat:
+            min_lat = v
+        if v > max_lat:
+            max_lat = v
+    for str_v in lon:
+        v = float(str_v)
+        if v < min_lon:
+            min_lon = v
+        if v > max_lon:
+            max_lon = v
+    max_range = max(abs(max_lat - min_lat), abs(max_lon - min_lon))
+    padding = max_range * .10
+    lat_axis = [min_lat - padding, max_lat + padding]
+    lon_axis = [min_lon - padding, max_lon + padding]
+    center_lat = (max_lat+min_lat) / 2
+    center_lon = (max_lon+min_lon) / 2
+    layout = dict(
+            title = 'Locations Map',
+            geo = dict(
+                showland = True,
+                showlakes = True,
+                showocean = True,
+                showrivers = True,
+                showcountries = True,
+                showsubunits = True,
+                projection=dict( type='mercator' ),
+                lataxis = {'range': lat_axis},
+                lonaxis = {'range': lon_axis},
+                center= {'lat': center_lat, 'lon': center_lon },
+                countrywidth = 3,
+                subunitwidth = 3
+            ),
+            autosize=True
+        )
+    graph = plot(dict(data=data, layout=layout ))
+
+def graph_links(keyword):
+    entities_obj_list = generate_entities_list(keyword)
+    subdict = {}
+    for ent in entities_obj_list:
+        count = str(ent.subjectcount)
+        if count not in subdict:
+            subdict[count] = 0
+        subdict[count] += 1
+    xlist = []
+    ylist = []
+    for count in subdict:
+        xlist.append(count)
+        ylist.append(subdict[count])
+    graph = plot({
+        "data":[Scatter(x=xlist,
+        y=ylist,
+        mode="markers"
+        )],
+        "layout": Layout(title="{} Link Distribution".format(keyword), autosize=True)}
+    )

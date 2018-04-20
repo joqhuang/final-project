@@ -1,6 +1,4 @@
 from flask import Flask, render_template, request
-from plotly.offline import plot
-from plotly.graph_objs import Scatter, Layout
 import model
 
 app = Flask(__name__)
@@ -40,33 +38,15 @@ def links(keyword, id):
                     keyword = keyword)
             else:
                 return render_template("nolinks.html",
-                    title=label,
-                    keyword=keyword,
-                    keywordurl = url,
+                    title = label,
+                    keyword = keyword,
                     var="links")
 
 @app.route('/<keyword>/graph')
 def graph(keyword):
-    entities_obj_list = model.generate_entities_list(keyword)
-    subdict = {}
-    for ent in entities_obj_list:
-        count = str(ent.subjectcount)
-        if count not in subdict:
-            subdict[count] = 0
-        subdict[count] += 1
-    xlist = []
-    ylist = []
-    for count in subdict:
-        xlist.append(count)
-        ylist.append(subdict[count])
-    graph = plot({
-        "data":[Scatter(x=xlist,
-        y=ylist,
-        mode="markers"
-        )],
-        "layout": Layout(title="{} Link Distribution".format(keyword), autosize=True)}
-    )
+    model.graph_links(keyword)
     return '<h3>Return to main results for <a href="/{}">{}</a></h3>'.format(keyword, keyword)
+
 
 @app.route('/<keyword>/map')
 def map(keyword):
@@ -80,7 +60,14 @@ def map(keyword):
             coordinates_dict[label] = {"lat":lat, "lon":lon}
         except:
             pass
-    
+    if len(coordinates_dict) == 0:
+        return render_template("nolinks.html",
+            keyword=keyword,
+            title = keyword,
+            var="locations")
+    else:
+        model.graph_locations(coordinates_dict)
+        return '<h3>Return to main results for <a href="/{}">{}</a></h3>'.format(keyword, keyword)
 
 if __name__ == '__main__':
     app.run(debug=True)
