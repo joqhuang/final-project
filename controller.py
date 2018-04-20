@@ -1,7 +1,13 @@
 import model
 import app
+import sqlite3 as sqlite
 
 if __name__ == '__main__':
+    try:
+        conn = sqlite.connect(model.DB_NAME)
+        conn.close()
+    except:
+        model.create_database()
     print("Hello, welcome to the program!")
     new_or_old = input('''
         To begin, would you like to add new data to the database
@@ -19,7 +25,7 @@ if __name__ == '__main__':
                 and collect it again? yes/no   ''')
                 if remove == 'yes':
                     model.remove_entry(keyword)
-                    model.run_query(keyword)
+                    model.get_dbpedia_data(keyword)
                 else:
                     print("Existing entry for {} will not be removed".format(keyword))
             else:

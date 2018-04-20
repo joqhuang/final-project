@@ -245,13 +245,6 @@ def generate_db_entity_data(dbpedia_html_list):
     conn.close()
     return len(entity_dict)
 
-def run_query(keyword):
-    items = get_dbpedia_data(keyword)
-    if items == 0:
-        print("There were no entries returned for {}".format(keyword))
-    else:
-        generate_db_entity_data(items)
-
 class Entity():
     def __init__(self, entity_tuple):
         self.label = entity_tuple[1]
