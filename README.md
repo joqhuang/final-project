@@ -14,7 +14,7 @@ These are directly integrated into flask application for display.
 <strong>Code Structure</strong>
 <br>The model.py file structures the data, which is funneled through to app.py to be formatted for display.
 
-The get_dbpedia_data function extracts data from dbpedia. It caches the search result for a keyword, and then crawls that list, retrieving and caching information for each particular search result, and returns a list of the html for each result. Because different queries can have overlapping results, this function checks each result before caching, so that only requests for new results are made to the dbpedia website. 
+The get_dbpedia_data function extracts data from dbpedia. It caches the search result for a keyword, and then crawls that list, retrieving and caching information for each particular search result, and returns a list of the html for each result. Because different queries can have overlapping results, this function checks each result before caching, so that only requests for new results are made to the dbpedia website. This function can be a little slow, depending on how many results are returned for a query.
 
 The generate_db_entity_data function takes the returned list of result html, and extracts relevant data to populate database tables. All results are populated into entities table. Additionally, if links or coordinates are available, location or link information will be added to their respective tables, pointing back to the primary key of the entity id.
 
