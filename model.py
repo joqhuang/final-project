@@ -91,7 +91,7 @@ def get_dbpedia_data(keyword):
             if entity_url in CACHE_DICTION:
                 entity_html = CACHE_DICTION[entity_url]
             else:
-                print("Extracting entities...")
+                print("Extracting entities...s")
                 entity_html_response_object = requests.get(entity_url)
                 entity_json_obj = json.dumps(entity_html_response_object.text)
                 CACHE_DICTION[entity_url]=json.loads(entity_json_obj)
@@ -138,7 +138,7 @@ def generate_db_entity_data(dbpedia_html_list):
     rows = cur.execute(existing_id_statement)
     for row in rows:
         existing_ids.append(row[0])
-    entity_dict = {}
+    entity_dict = {} #putting info into a dictionary ensures that ids are unique, since dictionary keys must be unique
     for dbpedia_html in dbpedia_html_list:
         try:
             dbpedia_soup = BeautifulSoup(dbpedia_html,'html.parser')
@@ -205,8 +205,76 @@ def generate_db_entity_data(dbpedia_html_list):
     conn.commit()
     conn.close()
 
+class Entity():
+    def __init__(self, entity_tuple):
+        self.label = entity_tuple[1]
+        self.url = entity_tuple[2]
+        self.desc = entity_tuple[3]
+        self.id = entity_tuple[0]
+
+    def getsubject(self, subject_tup_list):
+        self.subjects = subject_tup_list
+        self.subjectcount = len(subject_tup_list)
+
+    def getcoordinates(self, coordinates_tuple):
+        self.lat = coordinates_tuple[0]
+        self.lon = coordinates_tuple[1]
+
+    def __str__(self):
+        return "{}: {}".format(self.label, self.desc)
+
+def generate_entities_list(keyword):
+    conn = sqlite.connect(DB_NAME)
+    cur = conn.cursor()
+    find_entities = '''
+        SELECT Id, Label, Url, Description
+        FROM Entities
+        WHERE Description LIKE "%{}%"
+    '''.format(keyword)
+    rows = cur.execute(find_entities)
+    entities_obj_list = []
+    for row in rows:
+        entities_obj_list.append(Entity(row))
+    for entity in entities_obj_list:
+        find_links = '''
+            SELECT LinkUrl, LinkLabel
+            FROM Links
+            WHERE EntityId = {}
+        '''.format(entity.id)
+        rows = cur.execute(find_links).fetchall()
+        entity.getsubject(rows)
+    for entity in entities_obj_list:
+        find_places = '''
+            SELECT Latitude, Longitude
+            FROM Locations
+            WHERE EntityId = {}
+        '''.format(entity.id)
+        result = cur.execute(find_places).fetchall()
+        if len(result)>0:
+            entity.getcoordinates(result[0])
+    conn.close()
+    return entities_obj_list
+
+def get_sorted_objects(entities_obj_list, sortby='name', sortorder='desc'):
+    rev = (sortorder == 'desc')
+    if sortby == 'name':
+        sorted_objects = sorted(entities_obj_list, key= lambda x: x.label, reverse=rev)
+    elif sortby == 'relations':
+        sorted_objects = sorted(entities_obj_list, key= lambda x: x.subjectcount, reverse=rev)
+    else:
+        sorted_objects = sorted(entities_obj_list, key= lambda x: x.id, reverse=rev)
+    return sorted_objects
+
 if __name__ == "__main__":
     #create_database()
-    sample_pages = get_dbpedia_data("Shanghai Book City")
-    if len(sample_pages) > 0:
-        generate_db_entity_data(sample_pages)
+    #Give option to work with existing data or get new data
+    # sample_pages = get_dbpedia_data("Shanghai Book City")
+    # if len(sample_pages) > 0:
+    #     generate_db_entity_data(sample_pages)
+    sample = generate_entities_list("Gate")
+    # sorted = get_sorted_objects(sample, 'relations', 'asc')
+    # for item in sorted:
+    #     print(item)
+    sorted2 = get_sorted_objects(sample, 'relations', 'desc')
+    for item in sorted2:
+        print(item)

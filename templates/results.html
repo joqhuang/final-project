@@ -1,0 +1,33 @@
+<h1>Here are the results for "{{keyword}}":</h1>
+
+<form action="/{{keyword}}" method="POST">
+    Sort By:<br/>
+    <input type="radio" name="sortby" value="name"/> Name <br/>
+    <input type="radio" name="sortby" value="relations"/> Number of Relations <br/>
+    <input type="radio" name="sortby" value="id"/> Id Number <br/>
+    <br/>
+    Sort Order:<br/>
+    <input type="radio" name="sortorder" value="asc"/> Ascending <br/>
+    <input type="radio" name="sortorder" value="desc"/> Descending <br/>
+    <br/>
+    <input type="submit" name="update" value="Update"/>
+    <br/>
+    <br/>
+</form>
+
+<table border=1>
+    <tr>
+        <th>Id</th>
+        <th>Name</th>
+        <th>Description</th>
+        <th>Number of Relations</th>
+    </tr>
+{% for entity in entities %}
+    <tr>
+        <td>{{entity.id}}</td>
+        <td><a href="{{entity.url}}">{{entity.label}}</a></td>
+        <td>{{entity.desc}}</td>
+        <td><a href="/{{keyword}}/{{entity.id}}">{{entity.subjectcount}}</a></td>
+    </tr>
+{% endfor %}
+</table>

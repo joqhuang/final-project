@@ -1,0 +1,14 @@
+<h1>Here are the links for {{title}}</h1>
+<table border=1>
+    <tr>
+        <th>Linked Concept</th>
+        <th>URL</th>
+    </tr>
+{% for s in subject_list %}
+    <tr>
+        <td>{{s[0]}}</td>
+        <td><a href="{{s[1]}}">{{s[1]}}</a></td>
+    </tr>
+{% endfor %}
+</table>
+<p>Return to main results for <a href="/{{keyword}}">{{keyword}}</a></p>.
