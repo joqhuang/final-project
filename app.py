@@ -18,16 +18,21 @@ def index(keyword):
 def links(keyword, id):
     entities_obj_list = model.generate_entities_list(keyword)
     for obj in entities_obj_list:
-        if obj.id == id:
-            obj_label = obj.label
+        if str(obj.id) == id:
+            label = obj.label
+            url = obj.url
             subjects = obj.subjects
             if len(subjects) > 0:
                 return render_template("links.html",
-                    title = obj_label,
+                    keywordurl = url,
+                    title = label,
                     subject_list = subjects,
                     keyword = keyword)
             else:
-                return render_template("nolinks.html", title=obj_label, keyword=keyword)
+                return render_template("nolinks.html",
+                    title=label,
+                    keyword=keyword,
+                    keywordurl = url)
 
 if __name__ == '__main__':
     app.run(debug=True)

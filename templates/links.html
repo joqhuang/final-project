@@ -1,4 +1,4 @@
-<h1>Here are the links for {{title}}</h1>
+<h1>Here are the links for <a href={{keywordurl}}>{{title}}</a></h1>
 <table border=1>
     <tr>
         <th>Linked Concept</th>
@@ -6,8 +6,8 @@
     </tr>
 {% for s in subject_list %}
     <tr>
-        <td>{{s[0]}}</td>
-        <td><a href="{{s[1]}}">{{s[1]}}</a></td>
+        <td>{{s[1]}}</td>
+        <td><a href="{{s[0]}}">{{s[0]}}</a></td>
     </tr>
 {% endfor %}
 </table>

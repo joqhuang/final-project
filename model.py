@@ -67,10 +67,11 @@ def get_dbpedia_data(keyword):
     keyword = keyword.lower()
     page_url = "http://dbpedia.org/fct/facet.vsp?qxml=%3C%3Fxml%20version%3D%221.0%22%20encoding%3D%22UTF-8%22%20%3F%3E%3Cquery%20inference%3D%22%22%20same-as%3D%22%22%20view3%3D%22%22%20s-term%3D%22%22%20c-term%3D%22%22%20agg%3D%22%22%3E%3Ctext%3E{}%3C%2Ftext%3E%3Cview%20type%3D%22text-d%22%20limit%3D%2240000%22%20offset%3D%220%22%20%2F%3E%3C%2Fquery%3E".format(keyword.replace(" ","%20"))
     if keyword in CACHE_DICTION:
+        print("Retrieving from CACHE...")
         main_html = CACHE_DICTION[keyword]
     else:
         query_pages_html = []
-        print("Searching {} on dbpedia...".format(keyword))
+        print("Searching on dbpedia...")
         main_response_object = requests.get(page_url)
         main_page_json_obj = json.dumps(main_response_object.text)
         CACHE_DICTION[keyword] = json.loads(main_page_json_obj)
@@ -89,9 +90,10 @@ def get_dbpedia_data(keyword):
             href_attr = element.find("a")["href"]
             entity_url = "http://dbpedia.org{}".format(href_attr)
             if entity_url in CACHE_DICTION:
+                print("Retrieving entity from CACHE...")
                 entity_html = CACHE_DICTION[entity_url]
             else:
-                print("Extracting entities...s")
+                print("Crawling dbpedia to extract entities...")
                 entity_html_response_object = requests.get(entity_url)
                 entity_json_obj = json.dumps(entity_html_response_object.text)
                 CACHE_DICTION[entity_url]=json.loads(entity_json_obj)
@@ -105,6 +107,7 @@ def get_dbpedia_data(keyword):
             if dbpedia_url in CACHE_DICTION:
                 dbpedia_html = CACHE_DICTION[dbpedia_url]
             else:
+                print("Even more crawling...")
                 dbpedia_html_response_object = requests.get(dbpedia_url)
                 dbpedia_json_obj = json.dumps(dbpedia_html_response_object.text)
                 CACHE_DICTION[dbpedia_url]=json.loads(dbpedia_json_obj)
@@ -130,6 +133,38 @@ def get_dbpedia_data(keyword):
     conn.close()
     return dbpedia_html_list
 
+def check_query(keyword):
+    conn = sqlite.connect(DB_NAME)
+    cur = conn.cursor()
+    check_date = '''
+        SELECT Keyword, Entities, SearchDate
+        FROM Keywords
+        WHERE Keyword = {}
+    '''.format(keyword)
+    try:
+        tup = cur.execute(check_date).fetchone()
+        conn.close()
+        print("{} was searched on {}, with {} results.".format(tup[0],tup[2],tup[1]))
+        return True
+    except:
+        conn.close()
+        return False
+
+def remove_entry(keyword):
+    conn = sqlite.connect(DB_NAME)
+    cur = conn.cursor()
+    remove_keyword = '''
+        DELETE FROM Keywords
+        WHERE Keyword = {}
+    '''.format(keyword)
+    cur.execute(remove_keyword)
+    conn.close()
+    CACHE_DICTION.pop(keyword)
+    dumped_json_cache = json.dumps(CACHE_DICTION)
+    fw = open(CACHE_FNAME,"w")
+    fw.write(dumped_json_cache)
+    fw.close()
+
 def generate_db_entity_data(dbpedia_html_list):
     conn = sqlite.connect(DB_NAME)
     cur = conn.cursor()
@@ -151,25 +186,25 @@ def generate_db_entity_data(dbpedia_html_list):
                 "label":label,
                 "url":url
                 }
+            try:
+                subjectrow = dbpedia_soup.find(href="http://purl.org/dc/terms/subject")
+                subjects = subjectrow.parent.parent.find_all(class_="literal")
+            except:
+                subjects = []
+            subj_list = []
+            for subject in subjects:
+                label = subject.find("small").next_sibling[1:]
+                uri = subject.find("a")["href"]
+                subj_list.append((label,uri))
+            entity_dict[id]["subjects"] = subj_list
+            try:
+                points = dbpedia_soup.find(property = "georss:point").string
+                entity_dict[id]["lat"] = points.split()[0]
+                entity_dict[id]["lon"] = points.split()[1]
+            except:
+                pass
         except:
             print("Entity missing some element, skipping.")
-        try:
-            subjectrow = dbpedia_soup.find(href="http://purl.org/dc/terms/subject")
-            subjects = subjectrow.parent.parent.find_all(class_="literal")
-        except:
-            subjects = []
-        subj_list = []
-        for subject in subjects:
-            label = subject.find("small").next_sibling[1:]
-            uri = subject.find("a")["href"]
-            subj_list.append((label,uri))
-        entity_dict[id]["subjects"] = subj_list
-        try:
-            points = dbpedia_soup.find(property = "georss:point").string
-            entity_dict[id]["lat"] = points.split()[0]
-            entity_dict[id]["lon"] = points.split()[1]
-        except:
-            pass
     for key in entity_dict:
         if key not in existing_ids:
             params = [key,
@@ -204,6 +239,14 @@ def generate_db_entity_data(dbpedia_html_list):
             print("{} is not a location".format(key))
     conn.commit()
     conn.close()
+    return len(entity_dict)
+
+def run_query(keyword):
+    items = get_dbpedia_data(keyword)
+    if items == 0:
+        print("There were no entries returned for {}".format(keyword))
+    else:
+        generate_db_entity_data(items)
 
 class Entity():
     def __init__(self, entity_tuple):
@@ -264,17 +307,3 @@ def get_sorted_objects(entities_obj_list, sortby='name', sortorder='desc'):
     else:
         sorted_objects = sorted(entities_obj_list, key= lambda x: x.id, reverse=rev)
     return sorted_objects
-
-if __name__ == "__main__":
-    #create_database()
-    #Give option to work with existing data or get new data
-    # sample_pages = get_dbpedia_data("Shanghai Book City")
-    # if len(sample_pages) > 0:
-    #     generate_db_entity_data(sample_pages)
-    sample = generate_entities_list("Gate")
-    # sorted = get_sorted_objects(sample, 'relations', 'asc')
-    # for item in sorted:
-    #     print(item)
-    sorted2 = get_sorted_objects(sample, 'relations', 'desc')
-    for item in sorted2:
-        print(item)
